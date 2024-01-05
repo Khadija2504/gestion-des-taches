@@ -117,6 +117,11 @@ if (isset($_POST['add_multiple'])) {
 		input#task {
 			border: 1px black;
 		}
+		.form-group{
+			background-color:dodgerblue;
+			padding: 50px;
+			width: 500px;
+		}
 	</style>
 	
 	<script>

@@ -16,10 +16,9 @@ $update = new ADD_task();
 	$update = new ADD_task();
     $update->update_task();
 
-	  header('location: dashboard.php');
-	}
+	header('location: dashboard.php');
+}
 
- 
 ?>
 <!DOCTYPE html>
 <html lang="fr">

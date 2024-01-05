@@ -1,7 +1,5 @@
 <?php
 
-
-
 require_once '../models/tasks.model.php';
 
 
@@ -45,6 +43,16 @@ class ADD_task
         // You might want to show an error message or redirect to an error page
         echo "Task addition failed.";
     }
+}
+public function taskExists($userId, $projectId, $taskDescription)
+{
+    $db = Database::connect()->prepare("SELECT COUNT(*) FROM task WHERE user_id=:user AND project_id=:project_id AND task_descr=:task_descr");
+    $db->bindParam(':user', $userId);
+    $db->bindParam(':project_id', $projectId);
+    $db->bindParam(':task_descr', $taskDescription);
+    $db->execute();
+
+    return $db->fetchColumn() > 0;
 }
 public function add_doingtask()
 {
@@ -114,6 +122,33 @@ public function add_donetask()
 
         return task::getOnetask($task_id);
 
+    }
+
+    public function getTodoTasksForProject($userId, $projectId)
+    {
+        $db = Database::connect()->prepare("SELECT * FROM task WHERE statut='todo' AND user_id=:user AND project_id=:project_id ORDER BY task_end DESC");
+        $db->bindParam(':user', $userId);
+        $db->bindParam(':project_id', $projectId);
+        $db->execute();
+        return $db->fetchAll();
+    }
+
+    public function getDoingTasksForProject($userId, $projectId)
+    {
+        $db = Database::connect()->prepare("SELECT * FROM task WHERE statut='doing' AND user_id=:user AND project_id=:project_id ORDER BY task_end DESC");
+        $db->bindParam(':user', $userId);
+        $db->bindParam(':project_id', $projectId);
+        $db->execute();
+        return $db->fetchAll();
+    }
+
+    public function getDoneTasksForProject($userId, $projectId)
+    {
+        $db = Database::connect()->prepare("SELECT * FROM task WHERE statut='done' AND user_id=:user AND project_id=:project_id ORDER BY task_end DESC");
+        $db->bindParam(':user', $userId);
+        $db->bindParam(':project_id', $projectId);
+        $db->execute();
+        return $db->fetchAll();
     }
 
     public function delete_task()

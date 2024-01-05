@@ -1,20 +1,13 @@
 <?php
 session_start();
 require '../controller/tasks.Controller.php';
+require '../controller/projects.Controller.php';
 
 if (!isset($_SESSION['id'])) {
 	header('location:login.php');
 }
-function taskExists($userId, $projectId, $taskDescription)
-{
-    $db = Database::connect()->prepare("SELECT COUNT(*) FROM task WHERE user_id=:user AND project_id=:project_id AND task_descr=:task_descr");
-    $db->bindParam(':user', $userId);
-    $db->bindParam(':project_id', $projectId);
-    $db->bindParam(':task_descr', $taskDescription);
-    $db->execute();
 
-    return $db->fetchColumn() > 0;
-}
+$addTaskInstance = new ADD_task();
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -25,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $project_id = $_POST['project_id'];
         
         // Check if the task already exists
-        if (!taskExists($_SESSION['id'], $project_id, $task_descr)) {
+        if (!$addTaskInstance->taskExists($_SESSION['id'], $project_id, $task_descr)) {
             // Create an instance of ADD_task
             $addTaskInstance = new ADD_task();
             $addTaskInstance->add_todotask($task_descr, $task_end, $project_id);
@@ -34,54 +27,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: " . $_SERVER['PHP_SELF']);
             exit();
         } else {
-            // Task already exists, handle accordingly
-            // For example, redirecting to the same page with an error message
+
             $_SESSION['error_message'] = 'Task already exists.';
             header("Location: " . $_SERVER['PHP_SELF']);
             exit();
         }
     }
 }
-function getTodoTasksForProject($userId, $projectId)
-{
-    $db = Database::connect()->prepare("SELECT * FROM task WHERE statut='todo' AND user_id=:user AND project_id=:project_id ORDER BY task_end DESC");
-    $db->bindParam(':user', $userId);
-    $db->bindParam(':project_id', $projectId);
-    $db->execute();
-    return $db->fetchAll();
-}
-
-function getDoingTasksForProject($userId, $projectId)
-{
-    $db = Database::connect()->prepare("SELECT * FROM task WHERE statut='doing' AND user_id=:user AND project_id=:project_id ORDER BY task_end DESC");
-    $db->bindParam(':user', $userId);
-    $db->bindParam(':project_id', $projectId);
-    $db->execute();
-    return $db->fetchAll();
-}
-
-function getDoneTasksForProject($userId, $projectId)
-{
-    $db = Database::connect()->prepare("SELECT * FROM task WHERE statut='done' AND user_id=:user AND project_id=:project_id ORDER BY task_end DESC");
-    $db->bindParam(':user', $userId);
-    $db->bindParam(':project_id', $projectId);
-    $db->execute();
-    return $db->fetchAll();
-}
 
 $selectedProjectId = isset($_POST['selected_project']) ? $_POST['selected_project'] : (isset($_SESSION['project_id']) ? $_SESSION['project_id'] : null);
 
 // Get tasks based on selected project
-$todotasks = getTodoTasksForProject($_SESSION['id'], $selectedProjectId);
-$doingtasks = getDoingTasksForProject($_SESSION['id'], $selectedProjectId);
-$donetasks = getDoneTasksForProject($_SESSION['id'], $selectedProjectId);
-
+$todotasks = $addTaskInstance->getTodoTasksForProject($_SESSION['id'], $selectedProjectId);
+$doingtasks = $addTaskInstance->getDoingTasksForProject($_SESSION['id'], $selectedProjectId);
+$donetasks = $addTaskInstance->getDoneTasksForProject($_SESSION['id'], $selectedProjectId);
+$statics = new ProjectController();
 // Store the selected project in the session
 if (!empty($selectedProjectId)) {
     $_SESSION['project_id'] = $selectedProjectId;
 }
 if (!empty($selectedProjectId)) {
-    $selectedProjectDetails = getProjectDetails($selectedProjectId);
+    $selectedProjectDetails = $statics->getProjectDetails($selectedProjectId);
 
     // Check if the project details are fetched successfully
     if ($selectedProjectDetails) {
@@ -92,7 +58,6 @@ if (!empty($selectedProjectId)) {
         $projectName = "Project Not Found";
         $projectDescription = "Project details could not be retrieved.";
     }
-
 }
 
 if (isset($_POST['delete_project']) && !empty($selectedProjectId)) {
@@ -108,7 +73,6 @@ if (isset($_POST['delete_project']) && !empty($selectedProjectId)) {
     header("Location: " . $_SERVER['PHP_SELF']);
     exit();
 }
-
 
 ?>
 
@@ -146,21 +110,15 @@ if (isset($_POST['delete_project']) && !empty($selectedProjectId)) {
 
 		</div>
 
-		<form class="form" method="post" action="">
-    <select class="select-project" name="selected_project" onchange="this.form.submit()">
-        <option value="">Select a project</option>
-        <?php foreach ($userProjects as $project): ?>
-            <option value="<?php echo $project['project_id']; ?>"><?php echo $project['project_name']; ?></option>
-        <?php endforeach; ?>
-    </select>
-</form>
+		<form method="post" action="">
+			<select class="select-project" name="selected_project" onchange="this.form.submit()">
+				<option value="">Select a project</option>
+				<?php foreach ($userProjects as $project): ?>
+					<option value="<?php echo $project['project_id']; ?>"><?php echo $project['project_name']; ?></option>
+				<?php endforeach; ?>
+			</select>
+		</form>
 
-<!-- Delete Project form -->
-<form method="post" action="">
-    <input type="hidden" name="selected_project" value="<?php echo $selectedProjectId; ?>">
-    <button type="submit" name="delete_project" class="btn deleteProject btn-danger">Delete Project</button>
-</form>
-		
 		<form class="search" method="post" action="search.php" id="form">
 			<input type="search" name="word" id="form1" class="form-control" placeholder="Search" />
 			<button name="search" type="button" class="btn btn-primary" style="background-color: #4c94be">
@@ -176,6 +134,25 @@ if (isset($_POST['delete_project']) && !empty($selectedProjectId)) {
 	</header>
 	<div class="sep-page">
 		<section class="sidebar">
+			<div class="forms">
+			
+				<!-- Delete Project form -->
+				<form method="post" action="">
+					<input type="hidden" name="selected_project" value="<?php echo $selectedProjectId; ?>">
+					<button type="submit" name="delete_project" class="btn deleteProject btn-danger">Delete Project</button>
+				</form>
+
+				<form action="updateproject.php" method="post">
+					<input type="hidden" name="project_id" value="<?php echo $selectedProjectId; ?>">
+					<button type="submit" name="update_project" class="btn btn-primary">Update Project</button>
+				</form>
+
+				<form action="projectstats.php" method="post">
+					<input type="hidden" name="project_id" value="<?php echo $selectedProjectId; ?>">
+					<button type="submit" class="btn btn-info">Project Statistics</button>
+				</form>
+			</div>
+		
 		
 			<?php if (!empty($selectedProjectId)): ?>
 				<div class="selected-project-details">
@@ -200,31 +177,30 @@ if (isset($_POST['delete_project']) && !empty($selectedProjectId)) {
 
 		<!-- Lists container -->
 		<section class="lists-container d-flex flex-row ">
-		<section class="board-info-bar">
-		<form method="post" >
+			<section class="board-info-bar">
+			<form method="post" >
 
-			<div class="board-controls">
+				<div class="board-controls">
 
-				<!-- Button trigger modal -->
-				<a href="addtask.php">
-					<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal">
-						+ Add Multiple
-					</button>
-				</a>
-			</div>
-		</form>
-		<form method="post">
-			<div class="board-controls">
-				<a href="addproject.php"> <!-- Add this line for the new button -->
-					<button type="button" class="btn btn-primary">
-						+ Add Project
-					</button>
-				</a>
-				<!-- Your existing code for other controls -->
-			</div>
-		</form>
+					<!-- Button trigger modal -->
+					<a href="addtask.php">
+						<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal">
+							+ Add Multiple
+						</button>
+					</a>
+				</div>
+			</form>
+			<form method="post">
+				<div class="board-controls">
+					<a href="addproject.php">
+						<button type="button" class="btn btn-primary">
+							+ Add Project
+						</button>
+					</a>
+				</div>
+			</form>
 
-		</section>
+			</section>
 			<?php    if (isset($_POST['selected_project'])) {
 			$_SESSION['project_id'] = $_POST['selected_project'];
 			$selectedProjectId = $_SESSION['project_id'];
@@ -382,7 +358,6 @@ if (isset($_POST['delete_project']) && !empty($selectedProjectId)) {
 				<button type="button" id="donebtn" class="add_field_button btn btn-primary btn-md" onclick="addTaskdone() "><span
 						class="glyphicon glyphicon-plus" aria-hidden="true">+ Add New</span></button>
 			</div>
-			</div>
 			<?php
 			}
 			?>
@@ -417,6 +392,15 @@ function getProjectTasks($projectId)
 		input#task {
 			border: 1px black;
 		}
+		.forms{
+			display: flex;
+			flex-direction: column;
+			margin: 20px;
+			justify-content: space-between;
+		}
+		.forms form{
+			margin-bottom: 10px;
+		}
 
 		.board-info-bar {
 			display: grid;
@@ -438,7 +422,7 @@ function getProjectTasks($projectId)
 		}
 		.sidebar{
 			height: 100%;
-			width: 120%;
+			width: 200px;
 			background-color: #0067a3;
 			color: #fff;
 		}
@@ -458,12 +442,12 @@ function getProjectTasks($projectId)
 			height: 25px;
 			border-radius: 5px;
 			border-color: #0d6efd;
-			background-color: #eee;
+			background-color:ghostwhite;
 			cursor: pointer;
 			margin-right: 10%;
 		}
 		.select-project:hover{
-			background-color: #0d6efd;
+			background-color:#4c94be;
 		}
 		.select-project option{
 			background-color: cornflowerblue;
@@ -483,18 +467,13 @@ function getProjectTasks($projectId)
 		}
 		.masthead {
 			display: grid;
-			grid-template-columns: auto 2fr 2fr auto;
+			grid-template-columns: 2fr 3fr 2fr;
 			grid-column-gap: 2rem;
 		}
-		.form{
-			display: flex;
-			flex-direction: column;
-			z-index: 1001;
-			margin-top: 1%;
+		.lists-container{
+			width: auto;
 		}
-		.user-settings, .search{
-			margin-bottom: 35px;
-		}
+
 	</style>
 	<script>
 

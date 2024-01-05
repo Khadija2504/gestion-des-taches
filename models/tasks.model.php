@@ -137,7 +137,6 @@ static public function adddonetask($data)
         $tasks = $db->fetchAll();
         $db = NULL;
 
-
         return $tasks;
     }
 
